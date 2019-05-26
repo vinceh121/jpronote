@@ -21,6 +21,7 @@ import org.json.JSONObject;
 import org.jsoup.Jsoup;
 
 public class JPronote {
+	@SuppressWarnings("WeakerAccess")
 	public static final String DEFAULT_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.128 Electron/4.1.5 Safari/537.36";
 	private String token, endPoint, sessionId, userAgent;
 	private boolean isConnected;
@@ -31,6 +32,7 @@ public class JPronote {
 		this(sessionType, endPoint, DEFAULT_USER_AGENT);
 	}
 
+	@SuppressWarnings("WeakerAccess")
 	public JPronote(SessionType sessionType, String endPoint, String userAgent) {
 		this.endPoint = endPoint;
 		this.userAgent = userAgent;
@@ -44,28 +46,20 @@ public class JPronote {
 
 	public void loginCas(String casUrl, final String username, final String password)
 			throws IOException, AuthenticationException {
-		System.out.println(endPoint + sessionType.getLoginPath());
-
 		// Kdecole wants this number back in the form
-		HttpGet execGet = new HttpGet(casUrl);
+		HttpGet execGet = new HttpGet(casUrl + "?service=" + URLEncoder.encode(endPoint + sessionType.getLoginPath(), "UTF-8"));
 		execGet.setHeader("User-Agent", userAgent);
 		HttpResponse execRes = httpClient.execute(execGet);
-		String cookies = execRes.getFirstHeader("Set-Cookie").getValue();
 		ByteArrayOutputStream execStream = new ByteArrayOutputStream();
 		execRes.getEntity().writeTo(execStream);
 		final String execution = Jsoup.parse(execStream.toString()).getElementsByAttributeValue("name", "execution")
 				.first().val();
-		System.out.println("Execution: " + execution);
-		System.out.println("Cookies: " + cookies);
 
 		HttpPost post = new HttpPost(casUrl);
 		post.setHeader("Content-Type", "application/x-www-form-urlencoded");
-		post.setHeader("Cookies", cookies);
 		post.setHeader("User-Agent", userAgent);
-		post.setHeader("Referer", execGet.getURI().toString());
 		ArrayList<NameValuePair> list = new ArrayList<NameValuePair>();
 		list.add(new NameValuePair() {
-
 			public String getValue() {
 				return endPoint + sessionType.getLoginPath();
 			}
@@ -75,7 +69,6 @@ public class JPronote {
 			}
 		});
 		list.add(new NameValuePair() {
-
 			public String getValue() {
 				return "";
 			}
@@ -85,7 +78,6 @@ public class JPronote {
 			}
 		});
 		list.add(new NameValuePair() {
-
 			public String getValue() {
 				return "submit";
 			}
@@ -95,7 +87,6 @@ public class JPronote {
 			}
 		});
 		list.add(new NameValuePair() {
-
 			public String getValue() {
 				return "Valider";
 			}
@@ -105,7 +96,6 @@ public class JPronote {
 			}
 		});
 		list.add(new NameValuePair() {
-
 			public String getValue() {
 				return username;
 			}
@@ -115,7 +105,6 @@ public class JPronote {
 			}
 		});
 		list.add(new NameValuePair() {
-
 			public String getValue() {
 				return password;
 			}
@@ -125,7 +114,6 @@ public class JPronote {
 			}
 		});
 		list.add(new NameValuePair() {
-
 			public String getValue() {
 				return execution;
 			}
@@ -136,7 +124,6 @@ public class JPronote {
 		});
 
 		post.setEntity(new UrlEncodedFormEntity(list));
-
 		HttpResponse res = httpClient.execute(post);
 
 		if (res.getStatusLine().getStatusCode() == 401) {
@@ -144,7 +131,6 @@ public class JPronote {
 		}
 
 		System.out.println(res.getStatusLine().getStatusCode());
-		System.out.println("Location: " + res.getFirstHeader("Location"));
 		res.getEntity().writeTo(System.out);
 		this.isConnected = true;
 	}

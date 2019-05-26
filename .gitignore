@@ -1,1 +1,6 @@
+# IntelliJ shit
+.idea
+*.iml
+
 /target/
+/.settings/
