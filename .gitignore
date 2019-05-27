@@ -3,4 +3,10 @@
 *.iml
 
 /target/
+
+# Eclipse shit
 /.settings/
+.classpath
+.project
+
+/.github/
