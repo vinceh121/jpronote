@@ -1,177 +1,54 @@
 package me.vinceh121.jpronote;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.net.URLEncoder;
-import java.util.ArrayList;
 
+import me.vinceh121.jpronote.requester.LoginCAS;
+import me.vinceh121.jpronote.requester.Requester;
 import org.apache.http.HttpResponse;
-import org.apache.http.NameValuePair;
 import org.apache.http.auth.AuthenticationException;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.ResponseHandler;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.jsoup.Jsoup;
 
 public class JPronote {
-	@SuppressWarnings("WeakerAccess")
-	public static final String DEFAULT_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.128 Electron/4.1.5 Safari/537.36";
-	private String token, endPoint, sessionId, userAgent;
-	private boolean isConnected;
-	private SessionType sessionType;
-	private HttpClient httpClient;
+    @SuppressWarnings("WeakerAccess")
+    public static final String DEFAULT_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.128 Electron/4.1.5 Safari/537.36";
+    private final Requester requester;
+    private String token, sessionId, userAgent;
+    private boolean isConnected;
 
-	public JPronote(SessionType sessionType, String endPoint) {
-		this(sessionType, endPoint, DEFAULT_USER_AGENT);
-	}
+    public JPronote(String endpoint, SessionType sessionType) {
+        this(endpoint, sessionType, DEFAULT_USER_AGENT);
+    }
 
-	@SuppressWarnings("WeakerAccess")
-	public JPronote(SessionType sessionType, String endPoint, String userAgent) {
-		this.endPoint = endPoint;
-		this.userAgent = userAgent;
-		this.sessionType = sessionType;
-		this.httpClient = HttpClientBuilder.create().setUserAgent(userAgent).build();
-	}
+    @SuppressWarnings("WeakerAccess")
+    public JPronote(String endpoint, SessionType sessionType, String userAgent) {
+        requester = new Requester(endpoint, sessionType, userAgent);
+    }
 
-	public void login(String username, String password) {
+    public void login(String username, String password) {
 
-	}
+    }
 
-	public void loginCas(String casUrl, final String username, final String password)
-			throws IOException, AuthenticationException {
-		// Kdecole wants this number back in the form
-		HttpGet execGet = new HttpGet(casUrl + "?service=" + URLEncoder.encode(endPoint + sessionType.getLoginPath(), "UTF-8"));
-		execGet.setHeader("User-Agent", userAgent);
-		HttpResponse execRes = httpClient.execute(execGet);
-		ByteArrayOutputStream execStream = new ByteArrayOutputStream();
-		execRes.getEntity().writeTo(execStream);
-		final String execution = Jsoup.parse(execStream.toString()).getElementsByAttributeValue("name", "execution")
-				.first().val();
+    public void loginCas(String casUrl, String username, String password) throws AuthenticationException, IOException {
+        loginCas(casUrl, username, password, null);
+    }
 
-		HttpPost post = new HttpPost(casUrl);
-		post.setHeader("Content-Type", "application/x-www-form-urlencoded");
-		post.setHeader("User-Agent", userAgent);
-		ArrayList<NameValuePair> list = new ArrayList<NameValuePair>();
-		list.add(new NameValuePair() {
-			public String getValue() {
-				return endPoint + sessionType.getLoginPath();
-			}
+    public void loginCas(String casUrl, String username, String password, String selection) throws AuthenticationException, IOException {
+        final LoginCAS request = new LoginCAS(casUrl, username, password, selection);
+        HttpResponse res;
+        try {
+            res = requester.performRequest(request);
+        } catch (Exception e) {
+            AuthenticationException exception = new AuthenticationException("Failed to login using CAS");
+            exception.addSuppressed(e);
+            throw exception;
+        }
 
-			public String getName() {
-				return "service";
-			}
-		});
-		list.add(new NameValuePair() {
-			public String getValue() {
-				return "";
-			}
+        if (res.getStatusLine().getStatusCode() == 401) {
+            throw new AuthenticationException("Failed to login using CAS");
+        }
 
-			public String getName() {
-				return "geolocation";
-			}
-		});
-		list.add(new NameValuePair() {
-			public String getValue() {
-				return "submit";
-			}
-
-			public String getName() {
-				return "_eventId";
-			}
-		});
-		list.add(new NameValuePair() {
-			public String getValue() {
-				return "Valider";
-			}
-
-			public String getName() {
-				return "submit";
-			}
-		});
-		list.add(new NameValuePair() {
-			public String getValue() {
-				return username;
-			}
-
-			public String getName() {
-				return "username";
-			}
-		});
-		list.add(new NameValuePair() {
-			public String getValue() {
-				return password;
-			}
-
-			public String getName() {
-				return "password";
-			}
-		});
-		list.add(new NameValuePair() {
-			public String getValue() {
-				return execution;
-			}
-
-			public String getName() {
-				return "execution";
-			}
-		});
-
-		post.setEntity(new UrlEncodedFormEntity(list));
-		HttpResponse res = httpClient.execute(post);
-
-		if (res.getStatusLine().getStatusCode() == 401) {
-			throw new AuthenticationException("Failed to login using CAS");
-		}
-
-		System.out.println(res.getStatusLine().getStatusCode());
-		res.getEntity().writeTo(System.out);
-		this.isConnected = true;
-	}
-
-	public JSONObject makeRequest(HttpUriRequest req) {
-		try {
-			return httpClient.execute(req, new ResponseHandler<JSONObject>() {
-
-				public JSONObject handleResponse(HttpResponse response) throws ClientProtocolException, IOException {
-					int status = response.getStatusLine().getStatusCode();
-					if (status != 200) {
-						System.err.println("Status code: " + status);
-					}
-
-					ByteArrayOutputStream stream = new ByteArrayOutputStream();
-					response.getEntity().writeTo(stream);
-					try {
-						return new JSONObject(stream.toString());
-					} catch (JSONException e) {
-						return null;
-					}
-				}
-			});
-		} catch (ClientProtocolException e) {
-			e.printStackTrace();
-			return null;
-		} catch (IOException e) {
-			e.printStackTrace();
-			return null;
-		}
-	}
-
-	public JSONObject makeGetRequest(String request) {
-		if (!request.endsWith("/"))
-			request = request + "/";
-		HttpGet get = new HttpGet(endPoint + request);
-		// XXX: Headers
-		return makeRequest(get);
-	}
-
-	public JSONObject callFunction() {
-		return null;
-	}
+        // @todo: Follow 301 & rest of the flow
+        System.out.println(res.getStatusLine().getStatusCode());
+        res.getEntity().writeTo(System.out);
+        this.isConnected = true;
+    }
 }

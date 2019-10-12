@@ -2,5 +2,10 @@
 .idea
 *.iml
 
+# eclipse shit
+.classpath
+.settings
+.project
+
 /target/
 /.settings/
