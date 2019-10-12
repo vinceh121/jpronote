@@ -16,8 +16,7 @@ public class TestCasLogin {
 	@Test
 	public void test() throws HeadlessException, IOException, AuthenticationException {
 		JPronote api = new JPronote("https://0310024h.index-education.net/pronote", SessionType.STUDENT);
-		api.loginCas("https://cas.entmip.fr/login", JOptionPane.showInputDialog("Username"),
-				JOptionPane.showInputDialog("Password"), "TOULO-ENT_parent_eleve");
+		api.loginCas("https://cas.mon-ent-occitanie.fr/login", JOptionPane.showInputDialog("Username"), JOptionPane.showInputDialog("Password"), "TOULO-ENT_parent_eleve");
 	}
 
 }
