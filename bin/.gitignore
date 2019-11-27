@@ -1,0 +1,17 @@
+# IntelliJ shit
+.idea
+*.iml
+
+# eclipse shit
+.classpath
+.settings
+.project
+
+/target/
+
+# Eclipse shit
+/.settings/
+.classpath
+.project
+
+/.github/
