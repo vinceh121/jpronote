@@ -1,15 +1,16 @@
 package me.vinceh121.jpronote.requester;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.security.spec.RSAPublicKeySpec;
 import java.util.Base64;
-import java.util.Random;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
@@ -17,6 +18,10 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.MessageDigestAlgorithms;
+import org.apache.http.HttpException;
+import org.apache.http.HttpHost;
+import org.apache.http.HttpRequest;
+import org.apache.http.HttpRequestInterceptor;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
@@ -24,6 +29,7 @@ import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.LaxRedirectStrategy;
+import org.apache.http.protocol.HttpContext;
 import org.json.JSONObject;
 
 import me.vinceh121.jpronote.Page;
@@ -52,6 +58,24 @@ public class Requester {
 				.setUserAgent(userAgent).build();
 	}
 
+	public void halfHandshake(int session, String MR, String ER) throws Exception {
+		if (isAuthenticated)
+			throw new IllegalStateException("Handshake already performed!");
+		this.session = session;
+
+		// --- STEP 1: Prepare encryption
+		RSAPublicKeySpec keySpec = new RSAPublicKeySpec(new BigInteger(MR, 16), new BigInteger(ER, 16));
+		KeyFactory factory = KeyFactory.getInstance("RSA");
+		PublicKey pub = factory.generatePublic(keySpec);
+
+		new SecureRandom().nextBytes(iv);
+		String UUID = Base64.getEncoder().encodeToString(encrypt(iv, pub));
+
+		// --- STEP 2: FonctionParametres (Initial request)
+		parameters = performRequest("FonctionParametres", new JSONObject().put("Uuid", UUID));
+
+	}
+
 	public void handshake(int session, String MR, String ER, String username, String password, boolean throughCAS)
 			throws Exception {
 		if (isAuthenticated)
@@ -63,7 +87,7 @@ public class Requester {
 		KeyFactory factory = KeyFactory.getInstance("RSA");
 		PublicKey pub = factory.generatePublic(keySpec);
 
-		new Random().nextBytes(iv);
+		new SecureRandom().nextBytes(iv);
 		String UUID = Base64.getEncoder().encodeToString(encrypt(iv, pub));
 
 		// --- STEP 2: FonctionParametres (Initial request)
@@ -100,11 +124,12 @@ public class Requester {
 	}
 
 	public JSONObject navigate(Page toPage, JSONObject data) throws Exception {
+		this.page = toPage;
 		performRequest("Navigation", new JSONObject().put("ongletPrec", page.getId()).put("onglet", toPage.getId()));
 		return performRequest(toPage.getPageName(), data);
 	}
 
-	private JSONObject performRequest(String function, JSONObject data) throws Exception {
+	public JSONObject performRequest(String function, JSONObject data) throws Exception {
 		String numberStr = getNumber();
 		String url = endpoint + "/appelfonction/" + sessionType.getType() + "/" + numberStr;
 		JSONObject bodyData = new JSONObject().put("donnees", data);

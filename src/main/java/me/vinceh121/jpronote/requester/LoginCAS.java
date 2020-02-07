@@ -1,16 +1,17 @@
 package me.vinceh121.jpronote.requester;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.message.BasicNameValuePair;
 import org.jsoup.Jsoup;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.net.URLEncoder;
-import java.util.ArrayList;
 
 public class LoginCAS {
     private final String url;
@@ -32,8 +33,8 @@ public class LoginCAS {
     public HttpResponse execute(Requester requester) throws Exception {
         HttpPost request = new HttpPost(url);
         ArrayList<NameValuePair> list = fetchFields(requester);
-        list.add(ApacheHttpClientSucks.valuePair("username", username));
-        list.add(ApacheHttpClientSucks.valuePair("password", password));
+        list.add(new BasicNameValuePair("username", username));
+        list.add(new BasicNameValuePair("password", password));
         request.setEntity(new UrlEncodedFormEntity(list));
         return requester.getHttpClient().execute(request);
     }
@@ -51,7 +52,7 @@ public class LoginCAS {
         Jsoup.parse(execStream.toString()).getElementsByTag("input").forEach(input -> {
             final String name = input.attr("name");
             if (!"username".equals(name) && !"password".equals(name)) {
-                fields.add(ApacheHttpClientSucks.valuePair(name, input.attr("value")));
+                fields.add(new BasicNameValuePair(name, input.attr("value")));
             }
         });
         return fields;

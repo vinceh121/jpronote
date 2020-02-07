@@ -6,6 +6,7 @@ public final class PronoteErrorHandler {
 	private static Hashtable<Integer, String> errorCodes = new Hashtable<>();
 
 	static {
+		errorCodes.put(25, "Reached maximum number of authentifications");
 		errorCodes.put(22, "The document expired");
 		errorCodes.put(4, "Access denied");
 		errorCodes.put(7, "IP address suspended");

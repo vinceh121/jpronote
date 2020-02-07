@@ -16,7 +16,6 @@ public class JPronote {
 	@SuppressWarnings("WeakerAccess")
 	public static final String DEFAULT_USER_AGENT = "Mozilla/5.5 (Windows NT 11.0; Win64; x64; rv:71.0) Gecko/20150101 Firefox/72.2";
 	private final Requester requester;
-	private String token, sessionId, userAgent;
 
 	public JPronote(String endpoint, SessionType sessionType) {
 		this(endpoint, sessionType, DEFAULT_USER_AGENT);
@@ -44,6 +43,25 @@ public class JPronote {
 		try {
 			requester.handshake(Integer.parseInt(matcher.group(1)), matcher.group(2), matcher.group(3), username,
 					password, false);
+		} catch (Exception e) {
+			AuthenticationException exception = new AuthenticationException("Failed to authenticate with Pronote");
+			exception.initCause(e);
+			throw exception;
+		}
+	}
+
+	public void halfLogin(String username, String password) throws AuthenticationException, IOException {
+		HttpGet req = new HttpGet(requester.getEndpoint() + requester.getSessionType().getLoginPath());
+		HttpResponse res = requester.getHttpClient().execute(req);
+
+		ByteArrayOutputStream execStream = new ByteArrayOutputStream();
+		res.getEntity().writeTo(execStream);
+		Pattern pattern = Pattern.compile("onload=.*h:'(\\d+).*,MR:'(\\w+).*ER:'(\\d+)");
+		Matcher matcher = pattern.matcher(execStream.toString());
+		// noinspection ResultOfMethodCallIgnored
+		matcher.find();
+		try {
+			requester.halfHandshake(Integer.parseInt(matcher.group(1)), matcher.group(2), matcher.group(3));
 		} catch (Exception e) {
 			AuthenticationException exception = new AuthenticationException("Failed to authenticate with Pronote");
 			exception.initCause(e);
@@ -87,4 +105,5 @@ public class JPronote {
 			throw exception;
 		}
 	}
+
 }
