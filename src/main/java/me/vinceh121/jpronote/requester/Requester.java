@@ -1,7 +1,6 @@
 package me.vinceh121.jpronote.requester;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
@@ -18,10 +17,6 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.MessageDigestAlgorithms;
-import org.apache.http.HttpException;
-import org.apache.http.HttpHost;
-import org.apache.http.HttpRequest;
-import org.apache.http.HttpRequestInterceptor;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
@@ -29,8 +24,10 @@ import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.LaxRedirectStrategy;
-import org.apache.http.protocol.HttpContext;
-import org.json.JSONObject;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import me.vinceh121.jpronote.Page;
 import me.vinceh121.jpronote.PronoteErrorHandler;
@@ -38,11 +35,12 @@ import me.vinceh121.jpronote.PronoteException;
 import me.vinceh121.jpronote.SessionType;
 
 public class Requester {
+	private final ObjectMapper mapper = new ObjectMapper();
 	private final String endpoint;
 	private final SessionType sessionType;
 	private final HttpClient httpClient;
 	private boolean isAuthenticated = false;
-	private JSONObject parameters, identificationJson;
+	private JsonNode parameters, identificationJson;
 
 	private int session;
 
@@ -72,7 +70,7 @@ public class Requester {
 		String UUID = Base64.getEncoder().encodeToString(encrypt(iv, pub));
 
 		// --- STEP 2: FonctionParametres (Initial request)
-		parameters = performRequest("FonctionParametres", new JSONObject().put("Uuid", UUID));
+		parameters = performRequest("FonctionParametres",mapper.createObjectNode().put("Uuid", UUID));
 
 	}
 
@@ -91,19 +89,19 @@ public class Requester {
 		String UUID = Base64.getEncoder().encodeToString(encrypt(iv, pub));
 
 		// --- STEP 2: FonctionParametres (Initial request)
-		parameters = performRequest("FonctionParametres", new JSONObject().put("Uuid", UUID));
+		parameters = performRequest("FonctionParametres", mapper.createObjectNode().put("Uuid", UUID));
 
 		// --- STEP 3: Authenticate
-		JSONObject challengeJson = performRequest("Identification",
-				new JSONObject().put("demandeConnexionAppliMobile", false)
+		JsonNode challengeJson = performRequest("Identification",
+				mapper.createObjectNode().put("demandeConnexionAppliMobile", false)
 						.put("demandeConnexionAppliMobileJeton", false).put("demandeConnexionAuto", false)
 						.put("enConnexionAuto", false).put("genreConnexion", 0)
 						.put("genreEspace", sessionType.getType()).put("identifiant", username).put("loginTokenSAV", "")
 						.put("pourENT", throughCAS));
 
 		// --- STEP 4: Challenge
-		String challenge = challengeJson.getString("challenge");
-		String rnd = challengeJson.has("alea") ? challengeJson.getString("alea") : "";
+		String challenge = challengeJson.get("challenge").asText();
+		String rnd = challengeJson.has("alea") ? challengeJson.get("alea").asText() : "";
 		String hashed = hashPassword(password, rnd);
 		byte[] key = (throughCAS ? hashed : (username + hashed)).getBytes(StandardCharsets.UTF_8);
 //		byte[] key = Hex.decodeHex(throughCAS ? hashed : (username + hashed));
@@ -112,31 +110,32 @@ public class Requester {
 		byte[] cleanedChallenge = removeBS(decryptedChallenge);
 		String encryptedChallenge = Hex.encodeHexString(encryptAES(cleanedChallenge, key, iv));
 
-		identificationJson = performRequest("Authentification", new JSONObject().put("connexion", 0)
+		identificationJson = performRequest("Authentification",mapper.createObjectNode().put("connexion", 0)
 				.put("espace", sessionType.getType()).put("challenge", encryptedChallenge));
 
-		String rawKey = identificationJson.getString("cle");
+		String rawKey = identificationJson.get("cle").asText();
 		this.key = makeLessStupid(decryptAES(Hex.decodeHex(rawKey), key, iv));
 		isAuthenticated = true;
 
 		// --- STEP 5: Navigate - YES BECAUSE IT'S NOT EVEN FINISHED YET FFS
-		performRequest("Navigation", new JSONObject().put("ongletPrec", 7).put("onglet", 7));
+		performRequest("Navigation", mapper.createObjectNode().put("ongletPrec", 7).put("onglet", 7));
 	}
 
-	public JSONObject navigate(Page toPage, JSONObject data) throws Exception {
+	public JsonNode navigate(Page toPage, JsonNode data) throws Exception {
 		this.page = toPage;
-		performRequest("Navigation", new JSONObject().put("ongletPrec", page.getId()).put("onglet", toPage.getId()));
+		performRequest("Navigation", mapper.createObjectNode().put("ongletPrec", page.getId()).put("onglet", toPage.getId()));
 		return performRequest(toPage.getPageName(), data);
 	}
 
-	public JSONObject performRequest(String function, JSONObject data) throws Exception {
+	public JsonNode performRequest(String function, JsonNode data) throws Exception {
 		String numberStr = getNumber();
 		String url = endpoint + "/appelfonction/" + sessionType.getType() + "/" + numberStr;
-		JSONObject bodyData = new JSONObject().put("donnees", data);
+		ObjectNode bodyData = mapper.createObjectNode();
+		bodyData.set("donnees", data);
 		if (isAuthenticated)
-			bodyData.put("_Signature_", new JSONObject().put("onglet", page.getId()));
-		JSONObject body = new JSONObject().put("nom", function).put("session", session).put("numeroOrdre", numberStr)
-				.put("donneesSec", bodyData);
+			bodyData.set("_Signature_", mapper.createObjectNode().put("onglet", page.getId()));
+		JsonNode body = mapper.createObjectNode().put("nom", function).put("session", session).put("numeroOrdre", numberStr)
+				.set("donneesSec", bodyData);
 
 		HttpPost request = new HttpPost(url);
 		request.setEntity(new StringEntity(body.toString(), ContentType.APPLICATION_JSON));
@@ -145,19 +144,19 @@ public class Requester {
 		ByteArrayOutputStream execStream = new ByteArrayOutputStream();
 		response.getEntity().writeTo(execStream);
 		number += 2;
-		JSONObject answer = new JSONObject(execStream.toString());
+		JsonNode answer = mapper.readTree(execStream.toString());
 		if (answer.has("Erreur")) {
-			System.err.println(answer.getJSONObject("Erreur").toString(4));
-			throw new PronoteException(PronoteErrorHandler.getErrorMessage(answer.getJSONObject("Erreur").getInt("G")));
+			System.err.println(answer.get("Erreur").toPrettyString());
+			throw new PronoteException(PronoteErrorHandler.getErrorMessage(answer.get("Erreur").asInt()));
 		}
-		return answer.getJSONObject("donneesSec").getJSONObject("donnees");
+		return answer.get("donneesSec").get("donnees");
 	}
 
-	public JSONObject getParameters() {
+	public JsonNode getParameters() {
 		return parameters;
 	}
 
-	public JSONObject getAuthJson() {
+	public JsonNode getAuthJson() {
 		return identificationJson;
 	}
 

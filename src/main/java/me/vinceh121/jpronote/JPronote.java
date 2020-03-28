@@ -50,7 +50,7 @@ public class JPronote {
 		}
 	}
 
-	public void halfLogin(String username, String password) throws AuthenticationException, IOException {
+	public void halfLogin() throws AuthenticationException, IOException {
 		HttpGet req = new HttpGet(requester.getEndpoint() + requester.getSessionType().getLoginPath());
 		HttpResponse res = requester.getHttpClient().execute(req);
 

@@ -1,59 +1,53 @@
 package me.vinceh121.jpronote.entities;
 
-import java.time.LocalDateTime;
+import java.util.Date;
 
-import org.json.JSONPropertyName;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
+import me.vinceh121.jpronote.AbstractPronoteEntity;
 import me.vinceh121.jpronote.IPronoteEntity;
 
-public class Event implements IPronoteEntity {
+public class Event extends AbstractPronoteEntity implements IPronoteEntity {
 	private String name, comment, color;
 	private boolean isClassCouncil;
-	private LocalDateTime start, end;
+	private Date start, end;
 
-	@Override
-	public int getType() {
-		return 0;
-	}
-
-	@Override
-	@JSONPropertyName(value = "N")
-	public String getId() {
-		return null;
-	}
-
-	@JSONPropertyName(value = "L")
+	@JsonProperty("L")
 	public String getName() {
 		return name;
 	}
 
+	@JsonProperty("L")
 	public void setName(String name) {
 		this.name = name;
 	}
 
-	@JSONPropertyName(value = "Commentaire")
+	@JsonProperty("Commentaire")
 	public String getComment() {
 		return comment;
 	}
 
+	@JsonProperty("Commentaire")
 	public void setComment(String comment) {
 		this.comment = comment;
 	}
 
-	@JSONPropertyName(value = "CouleurCellule")
+	@JsonProperty("CouleurCellule")
 	public String getColor() {
 		return color;
 	}
 
+	@JsonProperty("CouleurCellule")
 	public void setColor(String color) {
 		this.color = color;
 	}
 
-	@JSONPropertyName(value = "estConseilClasse")
+	@JsonProperty("estConseilClasse")
 	public boolean isClassCouncil() {
 		return isClassCouncil;
 	}
 
+	@JsonProperty("estConseilClasse")
 	public void setClassCouncil(boolean isClassCouncil) {
 		this.isClassCouncil = isClassCouncil;
 	}

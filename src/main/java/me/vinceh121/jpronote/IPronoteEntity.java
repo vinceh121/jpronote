@@ -1,5 +1,7 @@
 package me.vinceh121.jpronote;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public interface IPronoteEntity {
 	/**
 	 * The type of an entity is determined by the G or _T JSON attributes
@@ -23,8 +25,14 @@ public interface IPronoteEntity {
 	 * 
 	 * @return The type of the implementing entity
 	 */
+	@JsonProperty("G")
 	public int getType();
 
+	@JsonProperty("_T")
+	public void setType(int type);
+
 	public String getId();
-	
+
+	public void setId(String id);
+
 }
