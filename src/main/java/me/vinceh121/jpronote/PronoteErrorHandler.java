@@ -6,17 +6,18 @@ public final class PronoteErrorHandler {
 	private static Hashtable<Integer, String> errorCodes = new Hashtable<>();
 
 	static {
-		errorCodes.put(25, "Reached maximum number of authentifications");
-		errorCodes.put(22, "The document expired");
-		errorCodes.put(4, "Access denied");
-		errorCodes.put(7, "IP address suspended");
+		PronoteErrorHandler.errorCodes.put(25, "Reached maximum number of authentifications");
+		PronoteErrorHandler.errorCodes.put(22, "The document expired");
+		PronoteErrorHandler.errorCodes.put(4, "Access denied");
+		PronoteErrorHandler.errorCodes.put(7, "IP address suspended");
 	}
 
-	public static String getErrorMessage(int code) {
-		final String err = errorCodes.get(code);
-		if (err != null)
+	public static String getErrorMessage(final int code) {
+		final String err = PronoteErrorHandler.errorCodes.get(code);
+		if (err != null) {
 			return err + " (" + code + ")";
-		else
+		} else {
 			return "Error code: " + code;
+		}
 	}
 }

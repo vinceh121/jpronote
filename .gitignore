@@ -4,14 +4,9 @@
 
 # eclipse shit
 .classpath
-.settings
-.project
-
-/target/
-
-# Eclipse shit
 /.settings/
-.classpath
 .project
+/bin/
+/target/
 
 /.github/

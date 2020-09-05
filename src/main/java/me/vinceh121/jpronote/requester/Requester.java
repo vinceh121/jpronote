@@ -1,6 +1,7 @@
 package me.vinceh121.jpronote.requester;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
@@ -17,13 +18,18 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.MessageDigestAlgorithms;
+import org.apache.http.HttpException;
+import org.apache.http.HttpRequest;
+import org.apache.http.HttpRequestInterceptor;
 import org.apache.http.HttpResponse;
+import org.apache.http.HttpResponseInterceptor;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.LaxRedirectStrategy;
+import org.apache.http.protocol.HttpContext;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -49,102 +55,132 @@ public class Requester {
 	private int number = 1;
 	private Page page = Page.HOMEPAGE;
 
-	public Requester(String endpoint, SessionType sessionType, String userAgent) {
+	public Requester(final String endpoint, final SessionType sessionType, final String userAgent) {
 		this.endpoint = endpoint;
 		this.sessionType = sessionType;
-		this.httpClient = HttpClientBuilder.create().setRedirectStrategy(new LaxRedirectStrategy())
-				.setUserAgent(userAgent).build();
+		this.httpClient = HttpClientBuilder.create()
+				.setRedirectStrategy(new LaxRedirectStrategy())
+				.setUserAgent(userAgent)
+				.addInterceptorFirst(new HttpRequestInterceptor() {
+					@Override
+					public void process(HttpRequest request, HttpContext context) throws HttpException, IOException {
+						System.out.println(request);
+					}
+				})
+				.addInterceptorFirst(new HttpResponseInterceptor() {
+
+					@Override
+					public void process(HttpResponse response, HttpContext context) throws HttpException, IOException {
+						System.out.println(response);
+					}
+				})
+				.build();
 	}
 
-	public void halfHandshake(int session, String MR, String ER) throws Exception {
-		if (isAuthenticated)
+	public void halfHandshake(final int session, final String MR, final String ER) throws Exception {
+		if (this.isAuthenticated) {
 			throw new IllegalStateException("Handshake already performed!");
+		}
 		this.session = session;
 
 		// --- STEP 1: Prepare encryption
-		RSAPublicKeySpec keySpec = new RSAPublicKeySpec(new BigInteger(MR, 16), new BigInteger(ER, 16));
-		KeyFactory factory = KeyFactory.getInstance("RSA");
-		PublicKey pub = factory.generatePublic(keySpec);
+		final RSAPublicKeySpec keySpec = new RSAPublicKeySpec(new BigInteger(MR, 16), new BigInteger(ER, 16));
+		final KeyFactory factory = KeyFactory.getInstance("RSA");
+		final PublicKey pub = factory.generatePublic(keySpec);
 
-		new SecureRandom().nextBytes(iv);
-		String UUID = Base64.getEncoder().encodeToString(encrypt(iv, pub));
+		new SecureRandom().nextBytes(this.iv);
+		final String UUID = Base64.getEncoder().encodeToString(Requester.encrypt(this.iv, pub));
 
 		// --- STEP 2: FonctionParametres (Initial request)
-		parameters = performRequest("FonctionParametres",mapper.createObjectNode().put("Uuid", UUID));
+		this.parameters = this.performRequest("FonctionParametres", this.mapper.createObjectNode().put("Uuid", UUID));
 
 	}
 
-	public void handshake(int session, String MR, String ER, String username, String password, boolean throughCAS)
-			throws Exception {
-		if (isAuthenticated)
+	public void handshake(final int session, final String MR, final String ER, final String username,
+			final String password, final boolean throughCAS) throws Exception {
+		if (this.isAuthenticated) {
 			throw new IllegalStateException("Handshake already performed!");
+		}
 		this.session = session;
 
 		// --- STEP 1: Prepare encryption
-		RSAPublicKeySpec keySpec = new RSAPublicKeySpec(new BigInteger(MR, 16), new BigInteger(ER, 16));
-		KeyFactory factory = KeyFactory.getInstance("RSA");
-		PublicKey pub = factory.generatePublic(keySpec);
+		final RSAPublicKeySpec keySpec = new RSAPublicKeySpec(new BigInteger(MR, 16), new BigInteger(ER, 16));
+		final KeyFactory factory = KeyFactory.getInstance("RSA");
+		final PublicKey pub = factory.generatePublic(keySpec);
 
-		new SecureRandom().nextBytes(iv);
-		String UUID = Base64.getEncoder().encodeToString(encrypt(iv, pub));
+		new SecureRandom().nextBytes(this.iv);
+		final String UUID = Base64.getEncoder().encodeToString(Requester.encrypt(this.iv, pub));
 
 		// --- STEP 2: FonctionParametres (Initial request)
-		parameters = performRequest("FonctionParametres", mapper.createObjectNode().put("Uuid", UUID));
+		this.parameters = this.performRequest("FonctionParametres", this.mapper.createObjectNode().put("Uuid", UUID));
 
 		// --- STEP 3: Authenticate
-		JsonNode challengeJson = performRequest("Identification",
-				mapper.createObjectNode().put("demandeConnexionAppliMobile", false)
-						.put("demandeConnexionAppliMobileJeton", false).put("demandeConnexionAuto", false)
-						.put("enConnexionAuto", false).put("genreConnexion", 0)
-						.put("genreEspace", sessionType.getType()).put("identifiant", username).put("loginTokenSAV", "")
+		final JsonNode challengeJson = this.performRequest("Identification",
+				this.mapper.createObjectNode()
+						.put("demandeConnexionAppliMobile", false)
+						.put("demandeConnexionAppliMobileJeton", false)
+						.put("demandeConnexionAuto", false)
+						.put("enConnexionAuto", false)
+						.put("genreConnexion", 0)
+						.put("genreEspace", this.sessionType.getType())
+						.put("identifiant", username)
+						.put("loginTokenSAV", "")
 						.put("pourENT", throughCAS));
 
 		// --- STEP 4: Challenge
-		String challenge = challengeJson.get("challenge").asText();
-		String rnd = challengeJson.has("alea") ? challengeJson.get("alea").asText() : "";
-		String hashed = hashPassword(password, rnd);
-		byte[] key = (throughCAS ? hashed : (username + hashed)).getBytes(StandardCharsets.UTF_8);
-//		byte[] key = Hex.decodeHex(throughCAS ? hashed : (username + hashed));
-//		byte[] key = Hex.decodeHex(hashed);
-		byte[] decryptedChallenge = decryptAES(Hex.decodeHex(challenge), key, iv);
-		byte[] cleanedChallenge = removeBS(decryptedChallenge);
-		String encryptedChallenge = Hex.encodeHexString(encryptAES(cleanedChallenge, key, iv));
+		final String challenge = challengeJson.get("challenge").asText();
+		final String rnd = challengeJson.has("alea") ? challengeJson.get("alea").asText() : "";
+		final String hashed = Requester.hashPassword(password, rnd);
+		final byte[] key = (throughCAS ? hashed : username + hashed).getBytes(StandardCharsets.UTF_8);
+		// byte[] key = Hex.decodeHex(throughCAS ? hashed : (username + hashed));
+		// byte[] key = Hex.decodeHex(hashed);
+		final byte[] decryptedChallenge = Requester.decryptAES(Hex.decodeHex(challenge), key, this.iv);
+		final byte[] cleanedChallenge = Requester.removeBS(decryptedChallenge);
+		final String encryptedChallenge = Hex.encodeHexString(Requester.encryptAES(cleanedChallenge, key, this.iv));
 
-		identificationJson = performRequest("Authentification",mapper.createObjectNode().put("connexion", 0)
-				.put("espace", sessionType.getType()).put("challenge", encryptedChallenge));
+		this.identificationJson = this.performRequest("Authentification",
+				this.mapper.createObjectNode()
+						.put("connexion", 0)
+						.put("espace", this.sessionType.getType())
+						.put("challenge", encryptedChallenge));
 
-		String rawKey = identificationJson.get("cle").asText();
-		this.key = makeLessStupid(decryptAES(Hex.decodeHex(rawKey), key, iv));
-		isAuthenticated = true;
+		final String rawKey = this.identificationJson.get("cle").asText();
+		this.key = Requester.makeLessStupid(Requester.decryptAES(Hex.decodeHex(rawKey), key, this.iv));
+		this.isAuthenticated = true;
 
 		// --- STEP 5: Navigate - YES BECAUSE IT'S NOT EVEN FINISHED YET FFS
-		performRequest("Navigation", mapper.createObjectNode().put("ongletPrec", 7).put("onglet", 7));
+		this.performRequest("Navigation", this.mapper.createObjectNode().put("ongletPrec", 7).put("onglet", 7));
 	}
 
-	public JsonNode navigate(Page toPage, JsonNode data) throws Exception {
+	public JsonNode navigate(final Page toPage, final JsonNode data) throws Exception {
 		this.page = toPage;
-		performRequest("Navigation", mapper.createObjectNode().put("ongletPrec", page.getId()).put("onglet", toPage.getId()));
-		return performRequest(toPage.getPageName(), data);
+		this.performRequest("Navigation",
+				this.mapper.createObjectNode().put("ongletPrec", this.page.getId()).put("onglet", toPage.getId()));
+		return this.performRequest(toPage.getPageName(), data);
 	}
 
-	public JsonNode performRequest(String function, JsonNode data) throws Exception {
-		String numberStr = getNumber();
-		String url = endpoint + "/appelfonction/" + sessionType.getType() + "/" + numberStr;
-		ObjectNode bodyData = mapper.createObjectNode();
+	public JsonNode performRequest(final String function, final JsonNode data) throws Exception {
+		final String numberStr = this.getNumber();
+		final String url = this.endpoint + "/appelfonction/" + this.sessionType.getType() + "/" + numberStr;
+		final ObjectNode bodyData = this.mapper.createObjectNode();
 		bodyData.set("donnees", data);
-		if (isAuthenticated)
-			bodyData.set("_Signature_", mapper.createObjectNode().put("onglet", page.getId()));
-		JsonNode body = mapper.createObjectNode().put("nom", function).put("session", session).put("numeroOrdre", numberStr)
+		if (this.isAuthenticated) {
+			bodyData.set("_Signature_", this.mapper.createObjectNode().put("onglet", this.page.getId()));
+		}
+		final JsonNode body = this.mapper.createObjectNode()
+				.put("nom", function)
+				.put("session", this.session)
+				.put("numeroOrdre", numberStr)
 				.set("donneesSec", bodyData);
 
-		HttpPost request = new HttpPost(url);
+		final HttpPost request = new HttpPost(url);
 		request.setEntity(new StringEntity(body.toString(), ContentType.APPLICATION_JSON));
-		HttpResponse response = httpClient.execute(request);
+		final HttpResponse response = this.httpClient.execute(request);
 
-		ByteArrayOutputStream execStream = new ByteArrayOutputStream();
+		final ByteArrayOutputStream execStream = new ByteArrayOutputStream();
 		response.getEntity().writeTo(execStream);
-		number += 2;
-		JsonNode answer = mapper.readTree(execStream.toString());
+		this.number += 2;
+		final JsonNode answer = this.mapper.readTree(execStream.toString());
 		if (answer.has("Erreur")) {
 			System.err.println(answer.get("Erreur").toPrettyString());
 			throw new PronoteException(PronoteErrorHandler.getErrorMessage(answer.get("Erreur").asInt()));
@@ -153,74 +189,77 @@ public class Requester {
 	}
 
 	public JsonNode getParameters() {
-		return parameters;
+		return this.parameters;
 	}
 
 	public JsonNode getAuthJson() {
-		return identificationJson;
+		return this.identificationJson;
 	}
 
 	// -----------------------//
 	// ---- Encryption bs ----//
 	// -----------------------//
 	private String getNumber() throws Exception {
-		byte[] plaintext = String.valueOf(number).getBytes();
-		byte[] rndiv = MessageDigest.getInstance(MessageDigestAlgorithms.MD5).digest(this.iv);
-		IvParameterSpec iv = new IvParameterSpec(number > 1 ? rndiv : new byte[16]);
-		SecretKeySpec keySpec = new SecretKeySpec(MessageDigest.getInstance(MessageDigestAlgorithms.MD5).digest(key),
-				"AES");
-		Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+		final byte[] plaintext = String.valueOf(this.number).getBytes();
+		final byte[] rndiv = MessageDigest.getInstance(MessageDigestAlgorithms.MD5).digest(this.iv);
+		final IvParameterSpec iv = new IvParameterSpec(this.number > 1 ? rndiv : new byte[16]);
+		final SecretKeySpec keySpec
+				= new SecretKeySpec(MessageDigest.getInstance(MessageDigestAlgorithms.MD5).digest(this.key), "AES");
+		final Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 		cipher.init(Cipher.ENCRYPT_MODE, keySpec, iv);
-		byte[] encrypted = cipher.doFinal(plaintext);
+		final byte[] encrypted = cipher.doFinal(plaintext);
 		return Hex.encodeHexString(encrypted, true);
 	}
 
-	private static byte[] encrypt(byte[] data, PublicKey publicKey) throws Exception {
-		Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+	private static byte[] encrypt(final byte[] data, final PublicKey publicKey) throws Exception {
+		final Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 		cipher.init(Cipher.ENCRYPT_MODE, publicKey);
 		return cipher.doFinal(data);
 	}
 
-	private static byte[] encryptAES(byte[] plaintext, byte[] key, byte[] ivv) throws Exception {
-		IvParameterSpec iv = new IvParameterSpec(MessageDigest.getInstance(MessageDigestAlgorithms.MD5).digest(ivv));
-		SecretKeySpec keySpec = new SecretKeySpec(MessageDigest.getInstance(MessageDigestAlgorithms.MD5).digest(key),
-				"AES");
-		Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+	private static byte[] encryptAES(final byte[] plaintext, final byte[] key, final byte[] ivv) throws Exception {
+		final IvParameterSpec iv
+				= new IvParameterSpec(MessageDigest.getInstance(MessageDigestAlgorithms.MD5).digest(ivv));
+		final SecretKeySpec keySpec
+				= new SecretKeySpec(MessageDigest.getInstance(MessageDigestAlgorithms.MD5).digest(key), "AES");
+		final Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 		cipher.init(Cipher.ENCRYPT_MODE, keySpec, iv);
 		return cipher.doFinal(plaintext);
 	}
 
-	private static byte[] decryptAES(byte[] plaintext, byte[] key, byte[] ivv) throws Exception {
-		IvParameterSpec iv = new IvParameterSpec(MessageDigest.getInstance(MessageDigestAlgorithms.MD5).digest(ivv));
-		SecretKeySpec keySpec = new SecretKeySpec(MessageDigest.getInstance(MessageDigestAlgorithms.MD5).digest(key),
-				"AES");
-		Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+	private static byte[] decryptAES(final byte[] plaintext, final byte[] key, final byte[] ivv) throws Exception {
+		final IvParameterSpec iv
+				= new IvParameterSpec(MessageDigest.getInstance(MessageDigestAlgorithms.MD5).digest(ivv));
+		final SecretKeySpec keySpec
+				= new SecretKeySpec(MessageDigest.getInstance(MessageDigestAlgorithms.MD5).digest(key), "AES");
+		final Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 		cipher.init(Cipher.DECRYPT_MODE, keySpec, iv);
 		return cipher.doFinal(plaintext);
 	}
 
-	private static byte[] removeBS(byte[] bytes) {
-		String st = new String(bytes, StandardCharsets.UTF_8);
-		StringBuilder s = new StringBuilder();
+	private static byte[] removeBS(final byte[] bytes) {
+		final String st = new String(bytes, StandardCharsets.UTF_8);
+		final StringBuilder s = new StringBuilder();
 		for (int i = 0; i < st.length(); i++) {
-			if (i % 2 == 0)
+			if (i % 2 == 0) {
 				s.append(st.charAt(i));
+			}
 		}
 		return s.toString().getBytes();
 	}
 
-	private static byte[] makeLessStupid(byte[] b) {
-		String s = new String(b);
-		String[] arr = s.split(",");
-		byte[] out = new byte[arr.length];
+	private static byte[] makeLessStupid(final byte[] b) {
+		final String s = new String(b);
+		final String[] arr = s.split(",");
+		final byte[] out = new byte[arr.length];
 		for (int i = 0; i < arr.length; i++) {
 			out[i] = (byte) Integer.parseInt(arr[i]);
 		}
 		return out;
 	}
 
-	private static String hashPassword(String password, String rnd) throws NoSuchAlgorithmException {
-		MessageDigest digest = MessageDigest.getInstance(MessageDigestAlgorithms.SHA_256);
+	private static String hashPassword(final String password, final String rnd) throws NoSuchAlgorithmException {
+		final MessageDigest digest = MessageDigest.getInstance(MessageDigestAlgorithms.SHA_256);
 		digest.update(rnd.getBytes());
 		digest.update(password.getBytes(StandardCharsets.UTF_8));
 		return Hex.encodeHexString(digest.digest(), false);
@@ -230,14 +269,14 @@ public class Requester {
 	// ---- Getters ----//
 	// -----------------//
 	public String getEndpoint() {
-		return endpoint;
+		return this.endpoint;
 	}
 
 	public SessionType getSessionType() {
-		return sessionType;
+		return this.sessionType;
 	}
 
 	public HttpClient getHttpClient() {
-		return httpClient;
+		return this.httpClient;
 	}
 }
