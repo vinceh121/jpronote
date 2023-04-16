@@ -42,15 +42,14 @@ public class JPronote {
 
 		final ByteArrayOutputStream execStream = new ByteArrayOutputStream();
 		res.getEntity().writeTo(execStream);
-		final Pattern pattern = Pattern.compile("onload=.*h:'(\\d+).*,MR:'(\\w+).*ER:'(\\d+)");
+		final Pattern pattern = Pattern.compile("onload=\"try \\{ Start \\((.*)\\) \\} catch");
 		final Matcher matcher = pattern.matcher(execStream.toString());
 		// noinspection ResultOfMethodCallIgnored
 		matcher.find();
+		ObjectNode sessInit = (ObjectNode) SESSION_INIT_MAPPER.readTree(matcher.group(1));
 		try {
-			final int session = Integer.parseInt(matcher.group(1));
-			final String mr = matcher.group(2);
-			final String er = matcher.group(3);
-			this.requester.handshake(session, mr, er, username, password, false);
+			this.requester.handshake(sessInit.get("h").asInt(), sessInit.get("MR").asText(),
+					sessInit.get("ER").asText(), username, password, false);
 		} catch (final Exception e) {
 			final AuthenticationException exception
 					= new AuthenticationException("Failed to authenticate with Pronote");
@@ -65,12 +64,14 @@ public class JPronote {
 
 		final ByteArrayOutputStream execStream = new ByteArrayOutputStream();
 		res.getEntity().writeTo(execStream);
-		final Pattern pattern = Pattern.compile("onload=.*h:'(\\d+).*,MR:'(\\w+).*ER:'(\\d+)");
+		final Pattern pattern = Pattern.compile("onload=\"try \\{ Start \\((.*)\\) \\} catch");
 		final Matcher matcher = pattern.matcher(execStream.toString());
 		// noinspection ResultOfMethodCallIgnored
 		matcher.find();
+		ObjectNode sessInit = (ObjectNode) SESSION_INIT_MAPPER.readTree(matcher.group(1));
 		try {
-			this.requester.halfHandshake(Integer.parseInt(matcher.group(1)), matcher.group(2), matcher.group(3));
+			this.requester.halfHandshake(sessInit.get("h").asInt(), sessInit.get("MR").asText(),
+					sessInit.get("ER").asText());
 		} catch (final Exception e) {
 			throw new AuthenticationException("Failed to authenticate with Pronote", e);
 		}
