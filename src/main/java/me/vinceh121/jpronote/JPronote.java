@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import me.vinceh121.jpronote.requester.LoginCAS;
 import me.vinceh121.jpronote.requester.Requester;
+import me.vinceh121.jpronote.responses.UserSettings;
 
 public class JPronote {
 	private static final ObjectMapper SESSION_INIT_MAPPER = new ObjectMapper();
@@ -114,6 +115,11 @@ public class JPronote {
 			exception.addSuppressed(e);
 			throw exception;
 		}
+	}
+
+	public UserSettings fetchUserSettings() throws IOException, PronoteException {
+		return this.requester.performParsedRequest("ParametresUtilisateur",
+				this.requester.getMapper().createObjectNode(), UserSettings.class);
 	}
 
 	static {

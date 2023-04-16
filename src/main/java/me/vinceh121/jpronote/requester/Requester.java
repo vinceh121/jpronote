@@ -31,6 +31,7 @@ import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.LaxRedirectStrategy;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -62,6 +63,9 @@ public class Requester {
 				.setRedirectStrategy(new LaxRedirectStrategy())
 				.setUserAgent(userAgent)
 				.build();
+
+		this.mapper.enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY);
+		this.mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 	}
 
 	public void halfHandshake(final int session, final String MR, final String ER) throws Exception {
@@ -186,7 +190,8 @@ public class Requester {
 
 	public <T> T performParsedRequest(String function, JsonNode data, Class<T> type)
 			throws IOException, PronoteException {
-		return this.mapper.readValue(this.performRequest(function, data).traverse(), type);
+		final JsonNode node = this.performRequest(function, data);
+		return this.mapper.readValue(node.traverse(), type);
 	}
 
 	public JsonNode getParameters() {
@@ -284,5 +289,9 @@ public class Requester {
 
 	public HttpClient getHttpClient() {
 		return this.httpClient;
+	}
+
+	public ObjectMapper getMapper() {
+		return this.mapper;
 	}
 }

@@ -1,4 +1,4 @@
-package me.vinceh121.jpronote.entities;
+package me.vinceh121.jpronote.primitives;
 
 import java.io.IOException;
 import java.util.HashMap;
