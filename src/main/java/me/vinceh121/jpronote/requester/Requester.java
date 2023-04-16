@@ -61,18 +61,6 @@ public class Requester {
 		this.httpClient = HttpClientBuilder.create()
 				.setRedirectStrategy(new LaxRedirectStrategy())
 				.setUserAgent(userAgent)
-				.addInterceptorFirst(new HttpRequestInterceptor() {
-					@Override
-					public void process(HttpRequest request, HttpContext context) throws HttpException, IOException {
-						System.out.println(request);
-					}
-				})
-				.addInterceptorFirst(new HttpResponseInterceptor() {
-					@Override
-					public void process(HttpResponse response, HttpContext context) throws HttpException, IOException {
-						System.out.println(response);
-					}
-				})
 				.build();
 	}
 
@@ -181,7 +169,6 @@ public class Requester {
 		this.number += 2;
 		final JsonNode answer = this.mapper.readTree(execStream.toString());
 		if (answer.has("Erreur")) {
-			System.err.println(answer.get("Erreur").toPrettyString());
 			throw new PronoteException(PronoteErrorHandler.getErrorMessage(answer.get("Erreur").asInt()));
 		}
 		return answer.get("donneesSec").get("donnees");
