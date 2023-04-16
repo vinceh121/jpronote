@@ -1,7 +1,6 @@
 package me.vinceh121.jpronote.entities;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 import me.vinceh121.jpronote.IPronoteEntity;
 

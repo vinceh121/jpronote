@@ -35,7 +35,11 @@ public enum PronoteType {
 	}
 
 	public static PronoteType fromTypeInt(int typeInt) {
-		return REVERSE_LUT.get(typeInt);
+		PronoteType t = REVERSE_LUT.get(typeInt);
+		if (t == null) {
+			throw new IllegalArgumentException("Invalid PronoteType typeInt " + typeInt);
+		}
+		return t;
 	}
 
 	private static class PronoteTypeDeserializer extends StdDeserializer<PronoteType> {
