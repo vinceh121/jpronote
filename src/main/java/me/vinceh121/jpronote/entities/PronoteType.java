@@ -14,7 +14,32 @@ import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 
 @JsonDeserialize(using = PronoteType.PronoteTypeDeserializer.class)
 public enum PronoteType {
-	GRADE(10);
+	/**
+	 * String as format `dd/MM/YYYY hh:mm:ss` with time part being optional
+	 */
+	DATE(7),
+	/**
+	 * Defines an int value range with the format `[start..end]` e.g. `[0..5]`.
+	 * It can be the empty value `[]`.
+	 * TODO find out bound inclusiveness
+	 */
+	RANGE(8),
+	/**
+	 * Float value with a comma for decimal separator.
+	 */
+	GRADE(10),
+	HTML_STRING(21),
+	FILE_URL(23),
+	/**
+	 * V value is a JSON array.
+	 */
+	LIST(24),
+	/**
+	 * File embedded in the response under the "/donneesNonSec/fichiers" array as a
+	 * B64 string. V value is the int index under the fichiers array.
+	 */
+	FILE(25),
+	SET(26);
 
 	private final int typeInt;
 
