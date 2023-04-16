@@ -146,6 +146,14 @@ public class Requester {
 		return this.performRequest(toPage.getPageName(), data);
 	}
 
+	/**
+	 * Performs raw request
+	 *
+	 * @param function function name
+	 * @param data passed data, will be mutated to add _Signature_
+	 * @return
+	 * @throws Exception
+	 */
 	public JsonNode performRequest(final String function, final JsonNode data) throws Exception {
 		final String numberStr = this.getNumber();
 		final String url = this.endpoint + "/appelfonction/" + this.sessionType.getType() + "/" + numberStr;
