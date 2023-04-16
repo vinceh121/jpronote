@@ -40,9 +40,11 @@ public class LoginCAS {
 	}
 
 	private ArrayList<NameValuePair> fetchFields(final Requester requester) throws IOException {
-		String endpoint = this.url
-				+ "?service="
-				+ URLEncoder.encode(requester.getEndpoint() + requester.getSessionType().getLoginPath(), "UTF-8");
+		String endpoint = this.url + "?service="
+		// 16/04/2023 vince: apparently the CAS service doesn't include the Pronote page
+		// type anymore. Otherwise Pronote returns an error page. Is this only for my
+		// CAS?
+				+ URLEncoder.encode(requester.getEndpoint(), "UTF-8");
 		if (this.selection != null) {
 			endpoint += "&selection=" + this.selection;
 		}

@@ -9,13 +9,18 @@ import org.apache.http.HttpResponse;
 import org.apache.http.auth.AuthenticationException;
 import org.apache.http.client.methods.HttpGet;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import me.vinceh121.jpronote.requester.LoginCAS;
 import me.vinceh121.jpronote.requester.Requester;
 
 public class JPronote {
+	private static final ObjectMapper SESSION_INIT_MAPPER = new ObjectMapper();
 	@SuppressWarnings("WeakerAccess")
 	public static final String DEFAULT_USER_AGENT
-			= "Mozilla/5.5 (Windows NT 11.0; Win64; x64; rv:71.0) Gecko/20150101 Firefox/72.2";
+			= "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/113.0";
 	private final Requester requester;
 
 	public JPronote(final String endpoint, final SessionType sessionType) {
@@ -94,14 +99,14 @@ public class JPronote {
 
 		final ByteArrayOutputStream execStream = new ByteArrayOutputStream();
 		res.getEntity().writeTo(execStream);
-		System.out.println();
-		final Pattern pattern = Pattern.compile("onload=.*h:'(\\d+).*,e:'(\\w+).*,f:'(\\w+).*,MR:'(\\w+).*ER:'(\\d+)");
+		final Pattern pattern = Pattern.compile("onload=\"try \\{ Start \\((.*)\\) \\} catch");
 		final Matcher matcher = pattern.matcher(execStream.toString());
 		// noinspection ResultOfMethodCallIgnored
 		matcher.find();
+		ObjectNode sessInit = (ObjectNode) SESSION_INIT_MAPPER.readTree(matcher.group(1));
 		try {
-			this.requester.handshake(Integer.parseInt(matcher.group(1)), matcher.group(4), matcher.group(5),
-					matcher.group(2), matcher.group(3), true);
+			this.requester.handshake(sessInit.get("h").asInt(), sessInit.get("MR").asText(),
+					sessInit.get("ER").asText(), sessInit.get("e").asText(), sessInit.get("f").asText(), true);
 		} catch (final Exception e) {
 			final AuthenticationException exception
 					= new AuthenticationException("Failed to authenticate with Pronote");
@@ -110,4 +115,8 @@ public class JPronote {
 		}
 	}
 
+	static {
+		SESSION_INIT_MAPPER.enable(JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES,
+				JsonParser.Feature.ALLOW_SINGLE_QUOTES);
+	}
 }
