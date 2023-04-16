@@ -4,6 +4,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -12,24 +14,22 @@ import java.security.SecureRandom;
 import java.security.spec.RSAPublicKeySpec;
 import java.util.Base64;
 
+import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.MessageDigestAlgorithms;
-import org.apache.http.HttpException;
-import org.apache.http.HttpRequest;
-import org.apache.http.HttpRequestInterceptor;
 import org.apache.http.HttpResponse;
-import org.apache.http.HttpResponseInterceptor;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.LaxRedirectStrategy;
-import org.apache.http.protocol.HttpContext;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -150,11 +150,13 @@ public class Requester {
 	 * Performs raw request
 	 *
 	 * @param function function name
-	 * @param data passed data, will be mutated to add _Signature_
+	 * @param data     passed data, will be mutated to add _Signature_
 	 * @return
+	 * @throws IOException
+	 * @throws PronoteException
 	 * @throws Exception
 	 */
-	public JsonNode performRequest(final String function, final JsonNode data) throws Exception {
+	public JsonNode performRequest(final String function, final JsonNode data) throws IOException, PronoteException {
 		final String numberStr = this.getNumber();
 		final String url = this.endpoint + "/appelfonction/" + this.sessionType.getType() + "/" + numberStr;
 		final ObjectNode bodyData = this.mapper.createObjectNode();
@@ -182,6 +184,11 @@ public class Requester {
 		return answer.get("donneesSec").get("donnees");
 	}
 
+	public <T> T performParsedRequest(String function, JsonNode data, Class<T> type)
+			throws IOException, PronoteException {
+		return this.mapper.readValue(this.performRequest(function, data).traverse(), type);
+	}
+
 	public JsonNode getParameters() {
 		return this.parameters;
 	}
@@ -193,16 +200,21 @@ public class Requester {
 	// -----------------------//
 	// ---- Encryption bs ----//
 	// -----------------------//
-	private String getNumber() throws Exception {
-		final byte[] plaintext = String.valueOf(this.number).getBytes();
-		final byte[] rndiv = MessageDigest.getInstance(MessageDigestAlgorithms.MD5).digest(this.iv);
-		final IvParameterSpec iv = new IvParameterSpec(this.number > 1 ? rndiv : new byte[16]);
-		final SecretKeySpec keySpec
-				= new SecretKeySpec(MessageDigest.getInstance(MessageDigestAlgorithms.MD5).digest(this.key), "AES");
-		final Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-		cipher.init(Cipher.ENCRYPT_MODE, keySpec, iv);
-		final byte[] encrypted = cipher.doFinal(plaintext);
-		return Hex.encodeHexString(encrypted, true);
+	private String getNumber() throws IOException {
+		try {
+			final byte[] plaintext = String.valueOf(this.number).getBytes();
+			final byte[] rndiv = MessageDigest.getInstance(MessageDigestAlgorithms.MD5).digest(this.iv);
+			final IvParameterSpec iv = new IvParameterSpec(this.number > 1 ? rndiv : new byte[16]);
+			final SecretKeySpec keySpec
+					= new SecretKeySpec(MessageDigest.getInstance(MessageDigestAlgorithms.MD5).digest(this.key), "AES");
+			final Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			cipher.init(Cipher.ENCRYPT_MODE, keySpec, iv);
+			final byte[] encrypted = cipher.doFinal(plaintext);
+			return Hex.encodeHexString(encrypted, true);
+		} catch (InvalidKeyException | InvalidAlgorithmParameterException | IllegalBlockSizeException
+				| BadPaddingException | NoSuchAlgorithmException | NoSuchPaddingException e) {
+			throw new IOException(e);
+		}
 	}
 
 	private static byte[] encrypt(final byte[] data, final PublicKey publicKey) throws Exception {
