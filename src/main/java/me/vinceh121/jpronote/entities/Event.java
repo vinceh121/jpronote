@@ -4,8 +4,6 @@ import java.util.Date;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import me.vinceh121.jpronote.AbstractPronoteEntity;
-
 public class Event extends AbstractPronoteEntity {
 	private String name, comment, color;
 	private boolean isClassCouncil;

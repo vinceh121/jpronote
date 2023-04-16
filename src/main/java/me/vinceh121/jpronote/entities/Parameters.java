@@ -1,4 +1,4 @@
-package me.vinceh121.jpronote;
+package me.vinceh121.jpronote.entities;
 
 import java.text.DateFormat;
 import java.text.ParseException;

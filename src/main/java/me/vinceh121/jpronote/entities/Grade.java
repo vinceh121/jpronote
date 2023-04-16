@@ -6,8 +6,6 @@ import java.util.Locale;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import me.vinceh121.jpronote.AbstractPronoteEntity;
-
 public class Grade extends AbstractPronoteEntity {
 	private String grade;
 

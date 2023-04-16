@@ -5,8 +5,6 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-import me.vinceh121.jpronote.AbstractPronoteEntity;
-
 public class PronoteDate extends AbstractPronoteEntity {
 	private static final DateFormat DATE_FORMAT = new SimpleDateFormat("dd/mm/yyyy");
 	private String value;
