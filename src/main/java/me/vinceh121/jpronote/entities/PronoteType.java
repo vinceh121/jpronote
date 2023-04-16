@@ -67,7 +67,7 @@ public enum PronoteType {
 		return t;
 	}
 
-	private static class PronoteTypeDeserializer extends StdDeserializer<PronoteType> {
+	public static class PronoteTypeDeserializer extends StdDeserializer<PronoteType> {
 		private static final long serialVersionUID = 7849606467081275309L;
 
 		public PronoteTypeDeserializer() {
