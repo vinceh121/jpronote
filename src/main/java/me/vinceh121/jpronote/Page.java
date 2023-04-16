@@ -17,7 +17,8 @@ public enum Page {
 	STAFF_ROSTER(143, "PageTrombinoscope"),
 	STUDENT_ROSTER(77, "PageTrombinoscope"),
 	PEDAGOGIC_ROSTER(179, "PageTrombinoscope"),
-	LIST_TEACHERS(123, "ListeRessources");
+	LIST_TEACHERS(123, "ListeRessources"),
+	SKILLS(201, "DernieresEvaluations");
 
 	private final int id;
 	private final String pageName;
