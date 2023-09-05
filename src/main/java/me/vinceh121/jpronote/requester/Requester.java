@@ -37,7 +37,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import me.vinceh121.jpronote.Page;
-import me.vinceh121.jpronote.PronoteErrorHandler;
 import me.vinceh121.jpronote.PronoteException;
 import me.vinceh121.jpronote.SessionType;
 
@@ -80,7 +79,7 @@ public class Requester {
 		final PublicKey pub = factory.generatePublic(keySpec);
 
 		new SecureRandom().nextBytes(this.iv);
-		final String UUID = Base64.getEncoder().encodeToString(Requester.encrypt(this.iv, pub));
+		final String UUID = Base64.getEncoder().encodeToString(this.iv);
 
 		// --- STEP 2: FonctionParametres (Initial request)
 		this.parameters = this.performRequest("FonctionParametres", this.mapper.createObjectNode().put("Uuid", UUID));
@@ -100,7 +99,9 @@ public class Requester {
 		final PublicKey pub = factory.generatePublic(keySpec);
 
 		new SecureRandom().nextBytes(this.iv);
-		final String UUID = Base64.getEncoder().encodeToString(Requester.encrypt(this.iv, pub));
+		// FIXME this was encrypted before, but isn't anymore *unless* the connection is HTTP
+		// this effectively removes the RSA step
+		final String UUID = Base64.getEncoder().encodeToString(this.iv);
 
 		// --- STEP 2: FonctionParametres (Initial request)
 		this.parameters = this.performRequest("FonctionParametres", this.mapper.createObjectNode().put("Uuid", UUID));
@@ -113,6 +114,7 @@ public class Requester {
 						.put("demandeConnexionAuto", false)
 						.put("enConnexionAuto", false)
 						.put("genreConnexion", 0)
+						.put("uuidAppliMobile", "")
 						.put("genreEspace", this.sessionType.getType())
 						.put("identifiant", username)
 						.put("loginTokenSAV", "")
@@ -183,7 +185,7 @@ public class Requester {
 		this.number += 2;
 		final JsonNode answer = this.mapper.readTree(execStream.toString());
 		if (answer.has("Erreur")) {
-			throw new PronoteException(PronoteErrorHandler.getErrorMessage(answer.get("Erreur").asInt()));
+			throw new PronoteException(answer.get("Erreur").get("Titre").asText());
 		}
 		return answer.get("donneesSec").get("donnees");
 	}

@@ -8,6 +8,9 @@ import java.util.regex.Pattern;
 import org.apache.http.HttpResponse;
 import org.apache.http.auth.AuthenticationException;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.util.EntityUtils;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Element;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,7 +22,10 @@ import me.vinceh121.jpronote.responses.UserSettings;
 
 public class JPronote {
 	private static final ObjectMapper SESSION_INIT_MAPPER = new ObjectMapper();
-	@SuppressWarnings("WeakerAccess")
+	private static final Pattern PAT_MR
+			= Pattern.compile(Pattern.quote("const c_rsaPub_modulo_1024='") + "([a-fA-F0-9]+)" + Pattern.quote("'"));
+	private static final Pattern PAT_ER
+	= Pattern.compile(Pattern.quote("const c_rsaPub_exposant_1024='") + "([a-fA-F0-9]+)" + Pattern.quote("'"));
 	public static final String DEFAULT_USER_AGENT
 			= "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/113.0";
 	private final Requester requester;
@@ -28,7 +34,6 @@ public class JPronote {
 		this(endpoint, sessionType, JPronote.DEFAULT_USER_AGENT);
 	}
 
-	@SuppressWarnings("WeakerAccess")
 	public JPronote(final String endpoint, final SessionType sessionType, final String userAgent) {
 		this.requester = new Requester(endpoint, sessionType, userAgent);
 	}
@@ -41,16 +46,49 @@ public class JPronote {
 		final HttpGet req = new HttpGet(this.requester.getEndpoint() + this.requester.getSessionType().getLoginPath());
 		final HttpResponse res = this.requester.getHttpClient().execute(req);
 
-		final ByteArrayOutputStream execStream = new ByteArrayOutputStream();
-		res.getEntity().writeTo(execStream);
+		// fetch session number in index.html
+		final String index = EntityUtils.toString(res.getEntity());
 		final Pattern pattern = Pattern.compile("onload=\"try \\{ Start \\((.*)\\) \\} catch");
-		final Matcher matcher = pattern.matcher(execStream.toString());
+		final Matcher matcher = pattern.matcher(index);
 		// noinspection ResultOfMethodCallIgnored
 		matcher.find();
 		ObjectNode sessInit = (ObjectNode) SESSION_INIT_MAPPER.readTree(matcher.group(1));
+
+		// fetch RSA keys in eleve.js
+		String eleveJsPath = null;
+		for (Element script : Jsoup.parse(index).getElementsByTag("script")) {
+			if (script.attr("src").endsWith("/eleve.js")) {
+				eleveJsPath = script.attr("src");
+			}
+		}
+
+		if (eleveJsPath == null) {
+			throw new IllegalStateException("Couldn't find path for eleve.js");
+		}
+
+		final HttpGet eleveReq = new HttpGet(this.requester.getEndpoint() + eleveJsPath);
+		final HttpResponse eleveRes = this.requester.getHttpClient().execute(eleveReq);
+
+		final String eleveJs = EntityUtils.toString(eleveRes.getEntity());
+
+		final Matcher mrMatcher = PAT_MR.matcher(eleveJs);
+
+		if (!mrMatcher.find()) {
+			throw new IllegalStateException("Cannot find MR in eleve.js");
+		}
+
+		final String MR = mrMatcher.group(1);
+
+		final Matcher erMatcher = PAT_ER.matcher(eleveJs);
+
+		if (!erMatcher.find()) {
+			throw new IllegalStateException("Cannot find MR in eleve.js");
+		}
+
+		final String ER = erMatcher.group(1);
+
 		try {
-			this.requester.handshake(sessInit.get("h").asInt(), sessInit.get("MR").asText(),
-					sessInit.get("ER").asText(), username, password, false);
+			this.requester.handshake(sessInit.get("h").asInt(), MR, ER, username, password, false);
 		} catch (final Exception e) {
 			final AuthenticationException exception
 					= new AuthenticationException("Failed to authenticate with Pronote");
